@@ -202,10 +202,10 @@ class SupportPortalBot(Plugin):
             if prev_ctrl:
                 await self.client.redact(self.control_room, prev_ctrl.event_id,
                                          "Control event replaced")
-            event_id = await self.client.send_markdown(
-                self.control_room, self.render("case_message", evt=evt, case=case))
-            self.control_event(event_id=event_id, case=evt.room_id,
-                               index=(prev_ctrl.index + 1) if prev_ctrl else 0).insert()
+                event_id = await self.client.send_markdown(
+                    self.control_room, self.render("case_message", evt=evt, case=case))
+                self.control_event(event_id=event_id, case=evt.room_id,
+                                   index=(prev_ctrl.index + 1) if prev_ctrl else 0).insert()
 
     @event.on(EventType.PRESENCE)
     async def agent_presence_handler(self, evt: PresenceEvent) -> None:
