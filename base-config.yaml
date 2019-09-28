@@ -6,6 +6,7 @@ template_prepend: |
     {% macro pill(user_id, displayname=None) -%}
         [{{ displayname or user_id }}](https://matrix.to/#/{{ user_id }})
     {%- endmacro %}
+
 # Message templates.
 templates:
     welcome: Thank you for contacting us. A support agent will be with you shortly.
