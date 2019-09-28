@@ -1,0 +1,35 @@
+# The room ID of the control room.
+control_room: '!foobar:example.com'
+
+# Content to prepend to all message templates.
+template_prepend: |
+    {% macro pill(user_id, displayname=None) -%}
+        [{{ displayname or user_id }}](https://matrix.to/#/{{ user_id }})
+    {%- endmacro %}
+# Message templates.
+templates:
+    welcome: Thank you for contacting us. A support agent will be with you shortly.
+    invite_error: Failed to handle invite from {{ pill(evt.sender) }}.
+    new_case: |-
+        Invite from {{ pill(case.user_id, case.displayname) }}.
+
+        👍️ this message to claim the case.
+    case_message: |-
+        Case from {{ pill(case.user_id, case.displayname) }} has new message, but no agents are in
+        the room.
+
+        👍️ this message to claim the case.
+    case_accepted: >-
+        Case from {{ pill(case.user_id, case.displayname) }}
+        accepted by {{ pill(evt.sender, sender_displayname) }}.
+    case_status: |-
+        Case from {{ pill(case.user_id, case.displayname) }}.
+
+        {% if agents %}
+        Agents in room:
+        {% for agent, profile in agents.items() %}
+        - {{ pill(agent, profile.displayname) }}
+        {% endfor %}
+        {% else %}
+        No agents in room.
+        {% endif %}
