@@ -64,6 +64,8 @@ class SupportPortalBot(Plugin):
         self.case_accept = CaseAccept.copy(bind=self.database, rebase=base)
         base.metadata.create_all()
 
+        self.agents = {}
+
         await self.update_agents()
 
         self.room_members = {}
@@ -76,8 +78,9 @@ class SupportPortalBot(Plugin):
         asyncio.ensure_future(self.update_agents(), loop=self.loop)
 
     async def update_agents(self) -> None:
-        self.agents = set((await self.client.get_joined_members(self.control_room)).keys())
-        self.agents.remove(self.client.mxid)
+        if self.control_room:
+            self.agents = set((await self.client.get_joined_members(self.control_room)).keys())
+            self.agents.remove(self.client.mxid)
 
     @classmethod
     def get_config_class(cls) -> Type[Config]:
@@ -111,6 +114,7 @@ class SupportPortalBot(Plugin):
             await self.client.join_room_by_id(evt.room_id)
             await self.client.send_text(evt.room_id, "Room registered as the control room")
             self.control_room = self.config["control_room"] = evt.room_id
+            await self.update_agents()
             self.config.save()
             return
 
