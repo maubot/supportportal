@@ -1,5 +1,5 @@
 # The room ID of the control room.
-control_room: '!foobar:example.com'
+control_room: null
 
 # Content to prepend to all message templates.
 template_prepend: |

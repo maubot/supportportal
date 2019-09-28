@@ -107,6 +107,12 @@ class SupportPortalBot(Plugin):
     async def self_invite_handler(self, evt: StateEvent) -> None:
         if evt.state_key != self.client.mxid or not evt.source & SyncStream.INVITED_ROOM:
             return
+        elif self.control_room is None:
+            await self.client.join_room_by_id(evt.room_id)
+            await self.client.send_text(evt.room_id, "Room registered as the control room")
+            self.control_room = self.config["control_room"] = evt.room_id
+            self.config.save()
+            return
 
         try:
             await self.client.join_room_by_id(evt.room_id)
