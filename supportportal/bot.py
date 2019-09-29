@@ -139,7 +139,6 @@ class SupportPortalBot(Plugin):
     async def agent_join_handler(self, evt: StateEvent) -> None:
         if evt.state_key == self.client.mxid or evt.state_key not in self.agents:
             return
-        print("Agent join:", evt)
         case = self.get_case(evt.room_id)
         if case:
             members = await self.get_room_members(evt.room_id)
@@ -149,28 +148,33 @@ class SupportPortalBot(Plugin):
 
     @event.on(InternalEventType.LEAVE)
     async def agent_leave_handler(self, evt: StateEvent) -> None:
-        if evt.state_key == self.client.mxid or evt.state_key not in self.agents:
+        if evt.state_key == self.client.mxid:
             return
-        print("Agent leave:", evt)
         case = self.get_case(evt.room_id)
         if case:
             ctrl = self.control_event.latest_for_case(case.id)
-            if ctrl:
-                accept = self.case_accept.get_by_ctrl(ctrl.event_id, evt.sender)
-                if accept:
-                    await self.client.redact(self.control_room, accept.event_id, "Agent left room")
-                    accept.delete()
+            if evt.state_key in self.agents:
+                if ctrl:
+                    accept = self.case_accept.get_by_ctrl(ctrl.event_id, evt.sender)
+                    if accept:
+                        await self.client.redact(self.control_room, accept.event_id, "Agent left room")
+                        accept.delete()
 
-            members = await self.get_room_members(evt.room_id)
-            try:
-                del members[evt.sender]
-            except KeyError:
-                pass
+                members = await self.get_room_members(evt.room_id)
+                try:
+                    del members[evt.sender]
+                except KeyError:
+                    pass
 
-            await self.update_case_status(case, members)
+                await self.update_case_status(case, members, ctrl)
+            elif evt.state_key == case.user_id and ctrl:
+                await self.client.send_markdown(
+                    room_id=self.control_room, edits=ctrl.event_id,
+                    markdown=self.render("case_closed", case=case, evt=evt))
 
-    async def update_case_status(self, case: Case, members: Dict[str, Member]) -> None:
-        ctrl = self.control_event.latest_for_case(case.id)
+    async def update_case_status(self, case: Case, members: Dict[str, Member],
+                                 ctrl: Optional[ControlEvent] = None) -> None:
+        ctrl = ctrl or self.control_event.latest_for_case(case.id)
         if not ctrl:
             self.log.warning("Tried to update case", case, "with no control event")
             return

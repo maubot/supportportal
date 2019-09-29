@@ -34,3 +34,5 @@ templates:
         {% else %}
         No agents in room.
         {% endif %}
+    case_closed: |-
+        Case from {{ pill(case.user_id, case.displayname) }} closed: user left the room.
