@@ -1,5 +1,3 @@
-image: dock.mau.dev/maubot/maubot
-
 stages:
 - build
 - push
@@ -8,6 +6,7 @@ variables:
   PYTHONPATH: /opt/maubot
 
 build:
+  image: dock.mau.dev/maubot/maubot
   stage: build
   except:
   - tags
@@ -18,6 +17,7 @@ build:
     - "*.mbp"
 
 build tags:
+  image: docker:stable
   stage: build
   only:
   - tags
@@ -28,6 +28,7 @@ build tags:
     - "*.mbp"
 
 build docker:
+  image: docker:stable
   stage: build
   script:
     - docker pull $CI_REGISTRY_IMAGE:latest || true
@@ -35,6 +36,7 @@ build docker:
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
 
 push latest:
+  image: docker:stable
   stage: push
   only:
   - master
