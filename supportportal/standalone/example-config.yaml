@@ -1,0 +1,73 @@
+user:
+    credentials:
+        id: "@support:example.com"
+        homeserver: https://example.com
+        access_token: foo
+    sync: true
+    autojoin: false
+    displayname: Support Bot
+    avatar_url: mxc://maunium.net/lhEQHHdhaeUxuroSNaCrrYbG
+
+database: sqlite:///support.db
+
+plugin_config:
+    # The room ID of the control room.
+    control_room: null
+
+    # Content to prepend to all message templates.
+    template_prepend: |
+        {% macro pill(user_id, displayname=None) -%}
+            [{{ displayname or user_id }}](https://matrix.to/#/{{ user_id }})
+        {%- endmacro %}
+
+    # Message templates.
+    templates:
+        welcome: Thank you for contacting us. A support agent will be with you shortly.
+        invite_error: Failed to handle invite from {{ pill(evt.sender) }}.
+        new_case: |-
+            Invite from {{ pill(case.user_id, case.displayname) }}.
+
+            👍️ this message to claim the case.
+        case_message: |-
+            Case from {{ pill(case.user_id, case.displayname) }} has new message, but no agents are in
+            the room.
+
+            👍️ this message to claim the case.
+        case_accepted: >-
+            Case from {{ pill(case.user_id, case.displayname) }}
+            accepted by {{ pill(evt.sender, sender_displayname) }}.
+        case_status: |-
+            Case from {{ pill(case.user_id, case.displayname) }}.
+
+            {% if agents %}
+            Agents in room:
+            {% for agent, profile in agents.items() %}
+            - {{ pill(agent, profile.displayname) }}
+            {% endfor %}
+            {% else %}
+            No agents in room.
+            {% endif %}
+        case_closed: |-
+            Case from {{ pill(case.user_id, case.displayname) }} closed: user left the room.
+
+
+logging:
+    version: 1
+    formatters:
+        colored:
+            (): maubot.lib.color_log.ColorFormatter
+            format: "[%(asctime)s] [%(levelname)s@%(name)s] %(message)s"
+    handlers:
+        console:
+            class: logging.StreamHandler
+            formatter: colored
+    loggers:
+        maubot:
+            level: DEBUG
+        mautrix:
+            level: DEBUG
+        aiohttp:
+            level: INFO
+    root:
+        level: DEBUG
+        handlers: [console]

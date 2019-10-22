@@ -64,7 +64,7 @@ class SupportPortalBot(Plugin):
         self.case_accept = CaseAccept.copy(bind=self.database, rebase=base)
         base.metadata.create_all()
 
-        self.agents = {}
+        self.agents = set()
 
         await self.update_agents()
 

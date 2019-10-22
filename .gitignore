@@ -1,1 +1,4 @@
 *.mbp
+config.yaml
+*.db
+__pycache__

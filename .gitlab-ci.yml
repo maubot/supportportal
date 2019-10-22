@@ -2,6 +2,7 @@ image: dock.mau.dev/maubot/maubot
 
 stages:
 - build
+- push
 
 variables:
   PYTHONPATH: /opt/maubot
@@ -25,3 +26,21 @@ build tags:
   artifacts:
     paths:
     - "*.mbp"
+
+build docker:
+  stage: build
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --pull --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA supportportal/standalone
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+push latest:
+  stage: push
+  only:
+  - master
+  variables:
+    GIT_STRATEGY: none
+  script:
+  - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+  - docker push $CI_REGISTRY_IMAGE:latest
