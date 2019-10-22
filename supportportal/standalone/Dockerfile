@@ -8,4 +8,4 @@ WORKDIR /opt/maubot/supportportal
 
 VOLUME /data
 
-CMD ["/opt/maubot/supportportal/standalone/docker-run.sh"]
+CMD ["/opt/maubot/supportportal/supportportal/standalone/docker-run.sh"]

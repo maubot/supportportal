@@ -7,7 +7,7 @@ function fixperms {
 cd /opt/maubot/supportportal
 
 if [ ! -f /data/config.yaml ]; then
-	cp standalone/example-config.yaml /data/config.yaml
+	cp supportportal/standalone/example-config.yaml /data/config.yaml
 	echo "Config file not found. Example config copied to /data/config.yaml"
 	echo "Please modify the config file to your liking and restart the container."
 	fixperms

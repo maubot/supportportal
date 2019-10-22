@@ -32,7 +32,7 @@ build docker:
   stage: build
   script:
     - docker pull $CI_REGISTRY_IMAGE:latest || true
-    - docker build --pull --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA supportportal/standalone
+    - docker build --pull --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA . -f supportportal/standalone/Dockerfile
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
 
 push latest:
