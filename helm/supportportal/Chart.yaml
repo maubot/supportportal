@@ -1,0 +1,13 @@
+apiVersion: v1
+name: supportportal
+version: 0.1.0
+appVersion: "0.1.0"
+description: A maubot to manage customer support on Matrix.
+keywords:
+  - matrix
+  - bot
+maintainers:
+  - name: Tulir Asokan
+    email: tulir@maunium.net
+sources:
+  - https://github.com/maubot/supportportal

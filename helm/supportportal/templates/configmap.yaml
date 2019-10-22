@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "supportportal.fullname" . }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/name: {{ template "supportportal.name" . }}
+data:
+  config.yaml: |
+    user:
+      credentials:
+        id: {{ .Values.user.credentials.id | quote }}
+        homeserver: {{ .Values.user.credentials.homeserver | quote }}
+        access_token: {{ .Values.user.credentials.access_token | quote }}
+      sync: {{ .Values.user.sync }}
+      autojoin: {{ .Values.user.autojoin }}
+      displayname: {{ .Values.user.displayname | quote }}
+      avatar_url: {{ .Values.user.avatar_url | quote }}
+    database: {{ .Values.database | quote }}
+    plugin_config:
+      {{- toYaml .Values.plugin_config | nindent 6 }}
+    logging:
+      {{- toYaml .Values.logging | nindent 6 }}
