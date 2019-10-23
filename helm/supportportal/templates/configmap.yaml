@@ -18,7 +18,13 @@ data:
       autojoin: {{ .Values.user.autojoin }}
       displayname: {{ .Values.user.displayname | quote }}
       avatar_url: {{ .Values.user.avatar_url | quote }}
+
+    {{- if .Values.postgresql.enabled }}
+    database: "postgres://postgres:{{ .Values.postgresql.postgresqlPassword }}@{{ .Release.Name }}-postgresql/{{ .Values.postgresql.postgresqlDatabase }}"
+    {{- else }}
     database: {{ .Values.database | quote }}
+    {{- end }}
+
     plugin_config:
       {{- toYaml .Values.plugin_config | nindent 6 }}
     logging:

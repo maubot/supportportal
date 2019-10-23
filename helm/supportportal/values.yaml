@@ -31,6 +31,17 @@ tolerations: []
 
 affinity: {}
 
+# Postgres pod configs
+postgresql:
+  enabled: true
+  postgresqlDatabase: maubot
+  persistence:
+    size: 2Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+
 user:
   credentials:
     id: "@support:example.com"
