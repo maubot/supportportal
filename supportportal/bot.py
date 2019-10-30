@@ -13,14 +13,14 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Type, Tuple, Dict, Optional, Set
+from typing import Type, Tuple, Dict, Optional, Set, Union
 import asyncio
 
 from jinja2 import Environment as JinjaEnvironment
 from sqlalchemy.ext.declarative import declarative_base
 
 from mautrix.types import (EventType, StateEvent, PresenceEvent, ReactionEvent, MessageEvent,
-                           RedactionEvent, RoomID, UserID, Member)
+                           RedactionEvent, RoomID, UserID, Member, RelationType)
 from mautrix.client import InternalEventType, MembershipEventDispatcher, SyncStream
 from mautrix.util.db import BaseClass
 
@@ -31,7 +31,6 @@ from .db import Case, ControlEvent, CaseAccept
 from .config import Config, ConfigTemplateLoader
 
 CLAIM_EMOJI = r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)"
-REJECT_EMOJI = r"(?:\U0001F44E[\U0001F3FB-\U0001F3FF]?)"
 
 
 class SupportPortalBot(Plugin):
@@ -215,9 +214,18 @@ class SupportPortalBot(Plugin):
     async def agent_presence_handler(self, evt: PresenceEvent) -> None:
         print("Presence:", evt.sender, evt.content)
 
+    @command.passive(CLAIM_EMOJI)
+    async def claim_case_reply(self, evt: MessageEvent, _: Tuple[str]) -> None:
+        if evt.content.relates_to.rel_type != RelationType.REFERENCE:
+            return
+        await self._claim_case(evt)
+
     @command.passive(regex=CLAIM_EMOJI, field=lambda evt: evt.content.relates_to.key,
                      event_type=EventType.REACTION, msgtypes=None)
-    async def claim_case(self, evt: ReactionEvent, key: Tuple[str]) -> None:
+    async def claim_case_reaction(self, evt: ReactionEvent, _: Tuple[str]) -> None:
+        await self._claim_case(evt)
+
+    async def _claim_case(self, evt: Union[ReactionEvent, MessageEvent]) -> None:
         if evt.room_id != self.control_room:
             return
         ctrl = self.control_event.get(evt.content.relates_to.event_id)
@@ -244,10 +252,3 @@ class SupportPortalBot(Plugin):
         if evt.room_id != self.control_room or evt.sender == self.client.mxid:
             return
         self.case_accept.delete_by_id(evt.redacts)
-
-    @command.passive(regex=REJECT_EMOJI, field=lambda evt: evt.content.relates_to.key,
-                     event_type=EventType.REACTION, msgtypes=None)
-    async def reject_case(self, evt: ReactionEvent, key: Tuple[str]) -> None:
-        if evt.room_id != self.control_room:
-            return
-        pass
