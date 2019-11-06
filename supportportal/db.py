@@ -26,6 +26,7 @@ class Case(BaseClass):
     __tablename__ = "case"
     id: RoomID = Column(String(255), primary_key=True)
     user_id: UserID = Column(String(255), nullable=False)
+    room_name: str = Column(Text, nullable=False)
     displayname: str = Column(Text, nullable=False)
 
     @classmethod

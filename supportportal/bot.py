@@ -29,6 +29,7 @@ from maubot.handlers import event, command
 
 from .db import Case, ControlEvent, CaseAccept
 from .config import Config, ConfigTemplateLoader
+from .util import with_case, ignore_self
 
 CLAIM_EMOJI = r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)"
 
@@ -135,41 +136,52 @@ class SupportPortalBot(Plugin):
         self.control_event(event_id=event_id, case=evt.room_id, index=0).insert()
 
     @event.on(InternalEventType.JOIN)
-    async def agent_join_handler(self, evt: StateEvent) -> None:
-        if evt.state_key == self.client.mxid or evt.state_key not in self.agents:
-            return
-        case = self.get_case(evt.room_id)
-        if case:
+    async def control_join_handler(self, evt: StateEvent) -> None:
+        if evt.room_id == self.control_room and evt.state_key != self.client.mxid:
+            self.agents.add(UserID(evt.state_key))
+
+    @event.on(InternalEventType.LEAVE)
+    async def control_leave_handler(self, evt: StateEvent) -> None:
+        if evt.room_id == self.control_room:
+            self.agents.remove(UserID(evt.state_key))
+
+    @event.on(InternalEventType.JOIN)
+    @ignore_self
+    @with_case
+    async def join_handler(self, evt: StateEvent, case: Case) -> None:
+        if evt.state_key in self.agents:
             members = await self.get_room_members(evt.room_id)
             members[evt.sender] = evt.content
 
             await self.update_case_status(case, members)
+        else:
+            await self.client.send_markdown(evt.room_id,
+                                            self.render("new_user", evt=evt, case=case))
 
     @event.on(InternalEventType.LEAVE)
-    async def agent_leave_handler(self, evt: StateEvent) -> None:
-        if evt.state_key == self.client.mxid:
-            return
-        case = self.get_case(evt.room_id)
-        if case:
-            ctrl = self.control_event.latest_for_case(case.id)
-            if evt.state_key in self.agents:
-                if ctrl:
-                    accept = self.case_accept.get_by_ctrl(ctrl.event_id, evt.sender)
-                    if accept:
-                        await self.client.redact(self.control_room, accept.event_id, "Agent left room")
-                        accept.delete()
+    @ignore_self
+    @with_case
+    async def leave_handler(self, evt: StateEvent, case: Case) -> None:
+        ctrl = self.control_event.latest_for_case(case.id)
+        if evt.state_key in self.agents:
+            if ctrl:
+                accept = self.case_accept.get_by_ctrl(ctrl.event_id, evt.sender)
+                if accept:
+                    await self.client.redact(self.control_room, accept.event_id,
+                                             "Agent left room")
+                    accept.delete()
 
-                members = await self.get_room_members(evt.room_id)
-                try:
-                    del members[evt.sender]
-                except KeyError:
-                    pass
+            members = await self.get_room_members(evt.room_id)
+            try:
+                del members[evt.sender]
+            except KeyError:
+                pass
 
-                await self.update_case_status(case, members, ctrl)
-            elif evt.state_key == case.user_id and ctrl:
-                await self.client.send_markdown(
-                    room_id=self.control_room, edits=ctrl.event_id,
-                    markdown=self.render("case_closed", case=case, evt=evt))
+            await self.update_case_status(case, members, ctrl)
+        # elif evt.state_key == case.user_id and ctrl:
+        #     await self.client.send_markdown(
+        #         room_id=self.control_room, edits=ctrl.event_id,
+        #         markdown=self.render("case_closed", case=case, evt=evt))
 
     async def update_case_status(self, case: Case, members: Dict[str, Member],
                                  ctrl: Optional[ControlEvent] = None) -> None:
@@ -182,22 +194,24 @@ class SupportPortalBot(Plugin):
                                         markdown=self.render("case_status", case=case,
                                                              agents=agents))
 
+    @event.on(EventType.ROOM_NAME)
+    @with_case
+    async def room_name_handler(self, evt: StateEvent, case: Case) -> None:
+        pass
+
     @event.on(InternalEventType.PROFILE_CHANGE)
-    async def displayname_change_handler(self, evt: StateEvent) -> None:
-        if evt.state_key == self.client.mxid:
-            return
-        case = self.get_case(evt.room_id)
-        if case and case.user_id == evt.state_key:
+    @ignore_self
+    @with_case
+    async def displayname_change_handler(self, evt: StateEvent, case: Case) -> None:
+        if case.user_id == evt.state_key:
             case.edit(displayname=evt.content.displayname)
             await self.update_case_status(case, await self.get_room_members(evt.room_id))
 
     @event.on(EventType.ROOM_MESSAGE)
-    async def case_message_handler(self, evt: MessageEvent) -> None:
+    @with_case
+    async def case_message_handler(self, evt: MessageEvent, case: Case) -> None:
         if evt.room_id == self.control_room or (evt.sender in self.agents
                                                 or evt.sender == self.client.mxid):
-            return
-        case = self.get_case(evt.room_id)
-        if not case:
             return
         members = await self.get_room_members(case.id)
         if len(members.keys() & self.agents) == 0:
@@ -209,10 +223,6 @@ class SupportPortalBot(Plugin):
                     self.control_room, self.render("case_message", evt=evt, case=case))
                 self.control_event(event_id=event_id, case=evt.room_id,
                                    index=(prev_ctrl.index + 1) if prev_ctrl else 0).insert()
-
-    @event.on(EventType.PRESENCE)
-    async def agent_presence_handler(self, evt: PresenceEvent) -> None:
-        print("Presence:", evt.sender, evt.content)
 
     @command.passive(CLAIM_EMOJI)
     async def claim_case_reply(self, evt: MessageEvent, _: Tuple[str]) -> None:

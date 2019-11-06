@@ -9,7 +9,14 @@ template_prepend: |
 
 # Message templates.
 templates:
-    welcome: Thank you for contacting us. A support agent will be with you shortly.
+    welcome: |-
+        Thank you for contacting us. A support agent will be with you shortly.
+
+        Please note that chat history is logged. By sending messages, you are
+        consenting to be recorded.
+    new_user:
+        Hello {{ pill(evt.state_key) }}, please note that chat history is
+        logged. By sending messages, you are consenting to be recorded.
     invite_error: Failed to handle invite from {{ pill(evt.sender) }}.
     new_case: |-
         Invite from {{ pill(case.user_id, case.displayname) }}.
