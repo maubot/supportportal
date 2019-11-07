@@ -16,28 +16,53 @@ plugin_config:
 
     # Content to prepend to all message templates.
     template_prepend: |
+        {% macro unmention(text) -%}
+            {{ text|join("\u2063") }}
+        {%- endmacro %}
         {% macro pill(user_id, displayname=None) -%}
-            [{{ displayname or user_id }}](https://matrix.to/#/{{ user_id }})
+            [{{ unmention(displayname or user_id) }}](https://matrix.to/#/{{ user_id }})
+        {%- endmacro %}
+        {% macro case_text(case, is_new=False) -%}
+            {% if is_new -%}
+                New case
+            {%- else -%}
+                Case
+            {%- endif -%}
+            {%- if case.user_id -%}
+                {% if case.room_name and case.room_name != case.displayname -%}
+                    : **{{ case.room_name }}** (from {{ pill(case.user_id, case.displayname) }})
+                {%- else -%}
+                    {# space adder #} from {{ pill(case.user_id, case.displayname) }}
+                {%- endif %}
+            {%- else -%}
+                : **{{ case.room_name }}** (group chat)
+            {%- endif %}
         {%- endmacro %}
 
     # Message templates.
     templates:
-        welcome: Thank you for contacting us. A support agent will be with you shortly.
+        welcome: |-
+            Thank you for contacting us. A support agent will be with you shortly.
+
+            Please note that chat history is logged. By sending messages, you are
+            consenting to be recorded.
+        new_user: |-
+            Hello {{ pill(evt.state_key) }}, please note that chat history is
+            logged. By sending messages, you are consenting to be recorded.
         invite_error: Failed to handle invite from {{ pill(evt.sender) }}.
         new_case: |-
-            Invite from {{ pill(case.user_id, case.displayname) }}.
+            {{ case_text(case, is_new=True) }}.
 
             👍️ this message to claim the case.
         case_message: |-
-            Case from {{ pill(case.user_id, case.displayname) }} has new message, but no agents are in
+            {{ case_text(case) }} has new message, but no agents are in
             the room.
 
             👍️ this message to claim the case.
-        case_accepted: >-
-            Case from {{ pill(case.user_id, case.displayname) }}
-            accepted by {{ pill(evt.sender, sender_displayname) }}.
+        case_accepted: |-
+            {{ case_text(case) }} accepted by {{ pill(evt.sender, sender_displayname) }}.
         case_status: |-
-            Case from {{ pill(case.user_id, case.displayname) }}.
+            {{ case_text(case) }}.
 
             {% if agents %}
             Agents in room:
@@ -49,7 +74,6 @@ plugin_config:
             {% endif %}
         case_closed: |-
             Case from {{ pill(case.user_id, case.displayname) }} closed: user left the room.
-
 
 logging:
     version: 1

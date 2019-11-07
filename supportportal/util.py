@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     from .bot import SupportPortalBot
 
 RoomEvent = Union[StateEvent, MessageEvent]
-EventHandler = Callable[[SupportPortalBot, RoomEvent], Awaitable[None]]
-CasefulEventHandler = Callable[[SupportPortalBot, RoomEvent, Case], Awaitable[None]]
+EventHandler = Callable[['SupportPortalBot', RoomEvent], Awaitable[None]]
+CasefulEventHandler = Callable[['SupportPortalBot', RoomEvent, Case], Awaitable[None]]
 
 
 def with_case(func: CasefulEventHandler) -> EventHandler:
@@ -36,7 +36,7 @@ def with_case(func: CasefulEventHandler) -> EventHandler:
     return caseful_handler
 
 
-def ignore_self(func: EventHandler) -> EventHandler:
+def ignore_control_bot(func: EventHandler) -> EventHandler:
     async def ignoring_handler(self: 'SupportPortalBot', evt: RoomEvent) -> None:
         if evt.state_key == self.client.mxid:
             return

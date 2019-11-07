@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Optional, Iterable
 
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Text, Integer, BigInteger, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declared_attr
 
 from mautrix.types import RoomID, EventID, UserID
@@ -25,9 +25,11 @@ from mautrix.util.db import BaseClass
 class Case(BaseClass):
     __tablename__ = "case"
     id: RoomID = Column(String(255), primary_key=True)
-    user_id: UserID = Column(String(255), nullable=False)
+    last_bot_msg: int = Column(BigInteger, nullable=False)
     room_name: str = Column(Text, nullable=False)
-    displayname: str = Column(Text, nullable=False)
+
+    user_id: UserID = Column(String(255), nullable=True)
+    displayname: str = Column(Text, nullable=True)
 
     @classmethod
     def get(cls, room_id: RoomID) -> Optional['Case']:

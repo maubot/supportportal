@@ -14,13 +14,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Type, Tuple, Dict, Optional, Set, Union
+from time import time
 import asyncio
 
 from jinja2 import Environment as JinjaEnvironment
 from sqlalchemy.ext.declarative import declarative_base
 
-from mautrix.types import (EventType, StateEvent, PresenceEvent, ReactionEvent, MessageEvent,
-                           RedactionEvent, RoomID, UserID, Member, RelationType)
+from mautrix.types import (EventType, StateEvent, ReactionEvent, MessageEvent, RedactionEvent,
+                           RoomID, UserID, Member, RelationType)
 from mautrix.client import InternalEventType, MembershipEventDispatcher, SyncStream
 from mautrix.util.db import BaseClass
 
@@ -29,7 +30,7 @@ from maubot.handlers import event, command
 
 from .db import Case, ControlEvent, CaseAccept
 from .config import Config, ConfigTemplateLoader
-from .util import with_case, ignore_self
+from .util import with_case, ignore_control_bot
 
 CLAIM_EMOJI = r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)"
 
@@ -120,13 +121,18 @@ class SupportPortalBot(Plugin):
 
         try:
             await self.client.join_room_by_id(evt.room_id)
-            member = await self.client.get_state_event(evt.room_id, EventType.ROOM_MEMBER,
-                                                       evt.sender)
-            case = self.case(id=evt.room_id, user_id=evt.sender,
-                             displayname=member.displayname)
+            name_evt = await self.client.get_state_event(evt.room_id, EventType.ROOM_NAME)
+            displayname = None
+            if evt.content.is_direct:
+                member = await self.client.get_state_event(evt.room_id, EventType.ROOM_MEMBER,
+                                                           evt.sender)
+                displayname = member.displayname
+            case = self.case(id=evt.room_id, room_name=name_evt.name if name_evt else "",
+                             user_id=evt.sender if evt.content.is_direct else None,
+                             displayname=displayname, last_bot_msg=int(time() * 1000))
+            await self.client.send_markdown(evt.room_id, self.render("welcome", evt=evt, case=case))
             case.insert()
             self.cases[evt.room_id] = case
-            await self.client.send_markdown(evt.room_id, self.render("welcome", evt=evt, case=case))
         except Exception:
             self.log.exception(f"Failed to handle invite from {evt.sender}")
             await self.client.send_markdown(self.control_room, self.render("invite_error", evt=evt))
@@ -146,7 +152,7 @@ class SupportPortalBot(Plugin):
             self.agents.remove(UserID(evt.state_key))
 
     @event.on(InternalEventType.JOIN)
-    @ignore_self
+    @ignore_control_bot
     @with_case
     async def join_handler(self, evt: StateEvent, case: Case) -> None:
         if evt.state_key in self.agents:
@@ -154,12 +160,13 @@ class SupportPortalBot(Plugin):
             members[evt.sender] = evt.content
 
             await self.update_case_status(case, members)
-        else:
+        elif case.last_bot_msg + 10_000 < evt.timestamp:
             await self.client.send_markdown(evt.room_id,
                                             self.render("new_user", evt=evt, case=case))
+            case.edit(last_bot_msg=int(time() * 1000))
 
     @event.on(InternalEventType.LEAVE)
-    @ignore_self
+    @ignore_control_bot
     @with_case
     async def leave_handler(self, evt: StateEvent, case: Case) -> None:
         ctrl = self.control_event.latest_for_case(case.id)
@@ -178,16 +185,17 @@ class SupportPortalBot(Plugin):
                 pass
 
             await self.update_case_status(case, members, ctrl)
-        # elif evt.state_key == case.user_id and ctrl:
-        #     await self.client.send_markdown(
-        #         room_id=self.control_room, edits=ctrl.event_id,
-        #         markdown=self.render("case_closed", case=case, evt=evt))
+        elif case.last_bot_msg + 10_000 < evt.timestamp and evt.state_key == case.user_id and ctrl:
+            await self.client.send_markdown(
+                room_id=self.control_room, edits=ctrl.event_id,
+                markdown=self.render("case_closed", case=case, evt=evt))
+            case.edit(last_bot_msg=int(time() * 1000))
 
     async def update_case_status(self, case: Case, members: Dict[str, Member],
                                  ctrl: Optional[ControlEvent] = None) -> None:
         ctrl = ctrl or self.control_event.latest_for_case(case.id)
         if not ctrl:
-            self.log.warning("Tried to update case", case, "with no control event")
+            self.log.warning(f"Tried to update case {case} with no control event")
             return
         agents = {key: value for key, value in members.items() if key in self.agents}
         await self.client.send_markdown(room_id=self.control_room, edits=ctrl.event_id,
@@ -197,10 +205,11 @@ class SupportPortalBot(Plugin):
     @event.on(EventType.ROOM_NAME)
     @with_case
     async def room_name_handler(self, evt: StateEvent, case: Case) -> None:
-        pass
+        case.edit(room_name=evt.content.name)
+        await self.update_case_status(case, await self.get_room_members(evt.room_id))
 
     @event.on(InternalEventType.PROFILE_CHANGE)
-    @ignore_self
+    @ignore_control_bot
     @with_case
     async def displayname_change_handler(self, evt: StateEvent, case: Case) -> None:
         if case.user_id == evt.state_key:
