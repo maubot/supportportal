@@ -14,6 +14,14 @@ plugin_config:
     # The room ID of the control room.
     control_room: null
 
+    # If a new user joins the room within this many seconds of the previous
+    # user joining, the bot won't send another user-welcome message.
+    new_user_cooldown: 10
+    # If a new message is sent in a case room with no agents within this many
+    # seconds of the previous message, the bot won't re-send the notification
+    # to the control room.
+    new_message_cooldown: 60
+
     # Content to prepend to all message templates.
     template_prepend: |
         {% macro unmention(text) -%}
@@ -35,7 +43,7 @@ plugin_config:
                     {# space adder #} from {{ pill(case.user_id, case.displayname) }}
                 {%- endif %}
             {%- else -%}
-                : **{{ case.room_name }}** (group chat)
+                : **{{ case.room_name }}** ({{ pill(case.id, case.room_name) }})
             {%- endif %}
         {%- endmacro %}
 
@@ -66,12 +74,12 @@ plugin_config:
 
             {% if agents %}
             Agents in room:
-            {% for agent, profile in agents.items() %}
-            - {{ pill(agent, profile.displayname) }}
+            {% for agent, profile in agents.items() -%}
+                - {{ pill(agent, profile.displayname) }}
             {% endfor %}
-            {% else %}
-            No agents in room.
-            {% endif %}
+            {% else -%}
+                No agents in room.
+            {%- endif %}
         case_closed: |-
             Case from {{ pill(case.user_id, case.displayname) }} closed: user left the room.
 

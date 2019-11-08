@@ -23,6 +23,8 @@ from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
         helper.copy("control_room")
+        helper.copy("new_user_cooldown")
+        helper.copy("new_message_cooldown")
         helper.copy("template_prepend")
         helper.copy_dict("templates")
 

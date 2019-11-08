@@ -28,12 +28,21 @@ CasefulEventHandler = Callable[['SupportPortalBot', RoomEvent, Case], Awaitable[
 
 
 def with_case(func: CasefulEventHandler) -> EventHandler:
+    @lock_room
     async def caseful_handler(self: 'SupportPortalBot', evt: RoomEvent) -> None:
         case = self.get_case(evt.room_id)
         if case:
             return await func(self, evt, case)
 
     return caseful_handler
+
+
+def lock_room(func: EventHandler) -> EventHandler:
+    async def locked_handler(self: 'SupportPortalBot', evt: RoomEvent) -> None:
+        async with self.locks[evt.room_id]:
+            return await func(self, evt)
+
+    return locked_handler
 
 
 def ignore_control_bot(func: EventHandler) -> EventHandler:

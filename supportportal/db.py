@@ -39,6 +39,7 @@ class Case(BaseClass):
 class ControlEvent(BaseClass):
     __tablename__ = "control_event"
     event_id: EventID = Column(String(255), primary_key=True)
+    timestamp: int = Column(BigInteger, nullable=False)
     case: RoomID
     index: int = Column(Integer, nullable=False)
 
