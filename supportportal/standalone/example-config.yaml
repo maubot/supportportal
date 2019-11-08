@@ -74,6 +74,7 @@ plugin_config:
 
             {% if agents %}
             Agents in room:
+
             {% for agent, profile in agents.items() -%}
                 - {{ pill(agent, profile.displayname) }}
             {% endfor %}
