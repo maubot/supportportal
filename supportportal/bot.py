@@ -122,6 +122,13 @@ class SupportPortalBot(Plugin):
             self.room_members[room_id] = await self.client.get_joined_members(room_id)
             return self.room_members[room_id]
 
+    async def _get_room_name(self, room_id: RoomID) -> str:
+        try:
+            name_evt = await self.client.get_state_event(room_id, EventType.ROOM_NAME)
+            return name_evt.name
+        except Exception:
+            return ""
+
     @event.on(InternalEventType.INVITE)
     @lock_room
     async def self_invite_handler(self, evt: StateEvent) -> None:
@@ -137,13 +144,12 @@ class SupportPortalBot(Plugin):
 
         try:
             await self.client.join_room_by_id(evt.room_id)
-            name_evt = await self.client.get_state_event(evt.room_id, EventType.ROOM_NAME)
             displayname = None
             if evt.content.is_direct:
                 member = await self.client.get_state_event(evt.room_id, EventType.ROOM_MEMBER,
                                                            evt.sender)
                 displayname = member.displayname
-            case = self.case(id=evt.room_id, room_name=name_evt.name if name_evt else "",
+            case = self.case(id=evt.room_id, room_name=await self._get_room_name(evt.room_id),
                              user_id=evt.sender if evt.content.is_direct else None,
                              displayname=displayname, last_bot_msg=now_ms())
             await self.client.send_markdown(evt.room_id, self.render("welcome", evt=evt, case=case))
