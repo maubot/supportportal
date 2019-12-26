@@ -17,7 +17,7 @@ build:
     - "*.mbp"
 
 build tags:
-  image: docker:stable
+  image: dock.mau.dev/maubot/maubot
   stage: build
   only:
   - tags
