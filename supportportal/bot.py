@@ -76,11 +76,11 @@ class SupportPortalBot(Plugin):
 
         self.agents = set()
 
-        await self.update_agents()
-
         self.room_members = {}
         self.cases = {}
         self.locks = defaultdict(lambda: asyncio.Lock())
+
+        await self.update_agents()
 
     def load_simple_vars(self) -> None:
         self.new_user_cooldown = self.config["new_user_cooldown"] * 1000
