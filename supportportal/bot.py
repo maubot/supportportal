@@ -59,6 +59,15 @@ class SupportPortalBot(Plugin):
     new_message_cooldown: int
     new_user_cooldown: int
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.agents = set()
+
+        self.room_members = {}
+        self.cases = {}
+        self.locks = defaultdict(lambda: asyncio.Lock())
+
     async def start(self) -> None:
         self.client.add_dispatcher(MembershipEventDispatcher)
 
@@ -73,12 +82,6 @@ class SupportPortalBot(Plugin):
         self.control_event = ControlEvent.copy(bind=self.database, rebase=base)
         self.case_accept = CaseAccept.copy(bind=self.database, rebase=base)
         base.metadata.create_all()
-
-        self.agents = set()
-
-        self.room_members = {}
-        self.cases = {}
-        self.locks = defaultdict(lambda: asyncio.Lock())
 
         await self.update_agents()
 
