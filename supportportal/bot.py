@@ -55,6 +55,7 @@ class SupportPortalBot(Plugin):
     locks: Dict[RoomID, asyncio.Lock]
     room_members: Dict[RoomID, Dict[UserID, Member]]
     agents: Set[UserID]
+    enabled_templates: Dict[str, bool]
 
     new_message_cooldown: int
     new_user_cooldown: int
@@ -66,6 +67,7 @@ class SupportPortalBot(Plugin):
 
         self.room_members = {}
         self.cases = {}
+        self.enabled_templates = {}
         self.locks = defaultdict(lambda: asyncio.Lock())
 
     async def start(self) -> None:
@@ -94,6 +96,7 @@ class SupportPortalBot(Plugin):
         self.config.load_and_update()
         self.load_simple_vars()
         self.jinja_env.loader.reload()
+        self.enabled_templates = {}
         asyncio.ensure_future(self.update_agents(), loop=self.loop)
 
     async def update_agents(self) -> None:
@@ -104,6 +107,13 @@ class SupportPortalBot(Plugin):
     @classmethod
     def get_config_class(cls) -> Type[Config]:
         return Config
+
+    def template_enabled(self, name: str) -> bool:
+        try:
+            return self.enabled_templates[name]
+        except KeyError:
+            ok = self.enabled_templates[name] = bool(self.config["templates"][name])
+            return ok
 
     def render(self, template: str, **kwargs) -> str:
         return self.jinja_env.get_template(template).render(**kwargs)
@@ -155,12 +165,16 @@ class SupportPortalBot(Plugin):
             case = self.case(id=evt.room_id, room_name=await self._get_room_name(evt.room_id),
                              user_id=evt.sender if evt.content.is_direct else None,
                              displayname=displayname, last_bot_msg=now_ms())
-            await self.client.send_markdown(evt.room_id, self.render("welcome", evt=evt, case=case))
+            if self.template_enabled("welcome"):
+                await self.client.send_markdown(evt.room_id,
+                                                self.render("welcome", evt=evt, case=case))
             case.insert()
             self.cases[evt.room_id] = case
         except Exception:
             self.log.exception(f"Failed to handle invite from {evt.sender}")
-            await self.client.send_markdown(self.control_room, self.render("invite_error", evt=evt))
+            if self.template_enabled("invite_error"):
+                await self.client.send_markdown(self.control_room,
+                                                self.render("invite_error", evt=evt))
             return
         event_id = await self.client.send_markdown(self.control_room,
                                                    self.render("new_case", evt=evt, case=case))
@@ -187,8 +201,9 @@ class SupportPortalBot(Plugin):
 
             await self.update_case_status(case, members)
         elif case.last_bot_msg + self.new_user_cooldown < evt.timestamp:
-            await self.client.send_markdown(evt.room_id,
-                                            self.render("new_user", evt=evt, case=case))
+            if self.template_enabled("new_user"):
+                await self.client.send_markdown(evt.room_id,
+                                                self.render("new_user", evt=evt, case=case))
             case.edit(last_bot_msg=now_ms())
 
     @event.on(InternalEventType.LEAVE)
@@ -213,9 +228,10 @@ class SupportPortalBot(Plugin):
             await self.update_case_status(case, members, ctrl)
         elif (case.last_bot_msg + self.new_user_cooldown < evt.timestamp
               and evt.state_key == case.user_id and ctrl):
-            await self.client.send_markdown(
-                room_id=self.control_room, edits=ctrl.event_id,
-                markdown=self.render("case_closed", case=case, evt=evt))
+            if self.template_enabled("case_closed"):
+                await self.client.send_markdown(
+                    room_id=self.control_room, edits=ctrl.event_id,
+                    markdown=self.render("case_closed", case=case, evt=evt))
             case.edit(last_bot_msg=now_ms())
 
     async def update_case_status(self, case: Case, members: Dict[str, Member],
@@ -225,9 +241,10 @@ class SupportPortalBot(Plugin):
             self.log.warning(f"Tried to update case {case} with no control event")
             return
         agents = {key: value for key, value in members.items() if key in self.agents}
-        await self.client.send_markdown(room_id=self.control_room, edits=ctrl.event_id,
-                                        markdown=self.render("case_status", case=case,
-                                                             agents=agents))
+        if self.template_enabled("case_status"):
+            await self.client.send_markdown(room_id=self.control_room, edits=ctrl.event_id,
+                                            markdown=self.render("case_status", case=case,
+                                                                 agents=agents))
 
     @event.on(EventType.ROOM_NAME)
     @with_case
@@ -289,10 +306,11 @@ class SupportPortalBot(Plugin):
         if len(members.keys() & self.agents) == 0:
             member = await self.client.get_state_event(evt.room_id, EventType.ROOM_MEMBER,
                                                        evt.sender)
-            await self.client.send_markdown(
-                room_id=self.control_room, edits=ctrl.event_id,
-                markdown=self.render("case_accepted", case=case, evt=evt,
-                                     sender_displayname=member.displayname))
+            if self.template_enabled("case_accepted"):
+                await self.client.send_markdown(
+                    room_id=self.control_room, edits=ctrl.event_id,
+                    markdown=self.render("case_accepted", case=case, evt=evt,
+                                         sender_displayname=member.displayname))
 
     @event.on(EventType.ROOM_REDACTION)
     async def redaction_handler(self, evt: RedactionEvent) -> None:
